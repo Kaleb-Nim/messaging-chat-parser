@@ -21,13 +21,18 @@ def parse_line(line: str, datetime_format: str) -> Tuple[Optional[datetime], str
     timestamp = None
     actor = 'invalid'
     text = ''
+    #[5/1/17, 5:44:01 PM] Kaleb: Hello?
+    line_elements = parse.parse("[{date}, {time}] {actor}: {text}", line)
 
-    line_elements = parse.parse("{date}, {time} - {actor}: {text}", line)
     if line_elements:
         message_datetime = f"{line_elements['date']}, {line_elements['time']}"  # e.g. "31/12/19, 20:02"
-        timestamp = datetime.strptime(message_datetime, datetime_format)
+        try:
+            timestamp = datetime.strptime(message_datetime, datetime_format)
+        except ValueError:
+            logging.warning(f"Invalid datetime format for line: {line},line elements: {line_elements}")
         actor = line_elements['actor']
         text = line_elements['text']
+
     return timestamp, actor, text
 
 
@@ -41,7 +46,7 @@ def stop_word_checker(actor, invalid_lines, text):
 
 def save_text(text_list: List[str], output_path: str):
     logging.info(f'Saving {output_path}')
-    with open(output_path, "w") as f:
+    with open(output_path, "w",encoding='utf-8') as f:
         f.writelines("\n".join(text_list))
 
 
@@ -53,7 +58,7 @@ def parse_chat(file_path: str,
     chat_text = [session_token] if session_token else []
     invalid_lines = []
 
-    with open(file_path) as f:
+    with open(file_path,encoding="utf-8") as f:
         lines = f.readlines()
         t_last = None
         for line in lines:
@@ -72,9 +77,8 @@ def parse_chat(file_path: str,
             chat_text.append(f"{actor} {text}")
     logging.info(f'Found {len(invalid_lines)} invalid lines in {file_path}')
 
-    open(f"./tmp/invalid_lines_{basename(file_path)}", 'w').writelines("\n".join(invalid_lines))
+    open(f"./tmp/invalid_lines_{basename(file_path)}", 'w',encoding='utf-8').writelines("\n".join(invalid_lines))
     return chat_text
-
 
 def run(user_name: str,
         chats_path: str,
@@ -108,7 +112,7 @@ def main(argv):
                              "one chat based on messages timing.")
     parser.add_argument("--delta_h_threshold", type=int, default=4,
                         help="Hours between two messages to before add 'session_token'")
-    parser.add_argument("--time_format", type=str, default="%d/%m/%y, %H:%M",
+    parser.add_argument("--time_format", type=str, default="%d/%m/%y, %H:%M:%S %p",
                         help="The WhatsApp datetime format. The default is the italian format.")
     parser.add_argument("-v", "--verbose", help="increase output verbosity", action="store_true")
     args = parser.parse_args(argv[1:])
